@@ -1,44 +1,106 @@
 openapi: 3.1.0
 info:
   title: E-Commerce XP API
-  version: 1.0.0
-  description: API para gestionar el catálogo y procesar pedidos de forma transaccional.
+  version: 1.1.0
+  description: API REST para autenticación, sesiones, catálogo y pedidos transaccionales.
 servers:
   - url: http://localhost:3000
     description: Entorno local
 tags:
-  - name: Pedidos
-    description: Checkout y gestión de pedidos
-  - name: Sesiones
-    description: HU07 - listado y revocación de sesiones activas
+  - { name: Autenticación, description: Registro y ciclo de vida de tokens }
+  - { name: Sesiones, description: Consulta y revocación de sesiones activas }
+  - { name: Productos, description: Consulta pública y administración del catálogo }
+  - { name: Pedidos, description: Checkout y gestión de pedidos }
+
 paths:
+  /api/auth/register:
+    post:
+      tags: [Autenticación]
+      summary: Registrar un cliente
+      description: El rol asignado siempre es `CLIENTE`.
+      operationId: registrarCliente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegistroDto' }
+            example: { clienteId: cliente_01, email: cliente01@example.com, password: 'Cliente#123', twoFactorEnabled: false }
+      responses:
+        '201':
+          description: Cliente registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioRegistrado' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
   /api/auth/login:
     post:
-      tags: [Sesiones]
-      summary: Iniciar una sesión identificando el dispositivo
+      tags: [Autenticación]
+      summary: Iniciar una sesión
       operationId: iniciarSesion
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/LoginDto'
+            schema: { $ref: '#/components/schemas/LoginDto' }
+            examples:
+              administrador:
+                value: { email: admin@estudio.local, password: 'Admin#12345', deviceName: Swagger UI }
+              clienteConSegundoFactor:
+                value: { email: cliente01@example.com, password: 'Cliente#123', totp: '123456', deviceName: Notebook }
       responses:
         '200':
           description: Sesión creada
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/LoginResponse'
-        '401':
-          description: Credenciales inválidas
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '429':
+          description: Demasiados intentos de login
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/auth/refresh:
+    post:
+      tags: [Autenticación]
+      summary: Renovar el access token
+      operationId: renovarAccessToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshTokenDto' }
+      responses:
+        '200':
+          description: Access token renovado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccessTokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /api/auth/logout:
+    post:
+      tags: [Autenticación]
+      summary: Cerrar una sesión
+      operationId: cerrarSesion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshTokenDto' }
+      responses:
+        '204': { description: Sesión cerrada; respuesta sin body }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
   /api/auth/sessions:
     get:
       tags: [Sesiones]
       summary: Listar las sesiones activas propias
       operationId: listarSesiones
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
           description: Sesiones activas
@@ -46,209 +108,414 @@ paths:
             application/json:
               schema:
                 type: array
-                items:
-                  $ref: '#/components/schemas/SesionActiva'
-        '403':
-          description: JWT inválido o sesión revocada
+                items: { $ref: '#/components/schemas/SesionActiva' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /api/auth/sessions/{sessionId}:
     delete:
       tags: [Sesiones]
       summary: Revocar una sesión propia
       operationId: revocarSesion
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: sessionId
-          required: true
-          schema:
-            type: string
-            format: uuid
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
       responses:
-        '204':
-          description: Sesión revocada
-        '403':
-          description: La sesión pertenece a otro usuario
-        '404':
-          description: Sesión inexistente
+        '204': { description: Sesión revocada; respuesta sin body }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/productos:
+    get:
+      tags: [Productos]
+      summary: Consultar el catálogo
+      operationId: listarProductos
+      parameters:
+        - in: query
+          name: categoria
+          description: Categoría exacta por la que se desea filtrar
+          schema: { type: string }
+          example: Periféricos
+      responses:
+        '200':
+          description: Catálogo de productos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Producto' }
+    post:
+      tags: [Productos]
+      summary: Crear un producto
+      description: Requiere rol `ADMIN`.
+      operationId: crearProducto
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CrearProductoDto' }
+            example: { nombre: Mouse inalámbrico, precio: 25000, stock: 10, categoria: Periféricos }
+      responses:
+        '201':
+          description: Producto creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Producto' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /api/productos/{id}/stock:
+    patch:
+      tags: [Productos]
+      summary: Actualizar el stock
+      description: Actualización parcial; requiere rol `ADMIN`.
+      operationId: actualizarStock
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ProductoId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActualizarStockDto' }
+            example: { stock: 25 }
+      responses:
+        '200':
+          description: Stock actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Producto' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /api/productos/{id}:
+    delete:
+      tags: [Productos]
+      summary: Eliminar un producto
+      description: Requiere rol `ADMIN`; falla si el producto pertenece a un pedido.
+      operationId: eliminarProducto
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ProductoId' }]
+      responses:
+        '204': { description: Producto eliminado; respuesta sin body }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /api/pedidos:
+    get:
+      tags: [Pedidos]
+      summary: Listar todos los pedidos
+      description: Requiere rol `ADMIN`.
+      operationId: listarPedidos
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lista completa de pedidos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Pedido' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [Pedidos]
       summary: Procesar un pedido
-      description: Crea el pedido, descuenta el stock y registra sus detalles en una única transacción.
+      description: Crea el pedido y descuenta el stock en una única transacción.
       operationId: crearPedido
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/CrearPedidoDto'
+            schema: { $ref: '#/components/schemas/CrearPedidoDto' }
             examples:
               variosProductos:
-                summary: Pedido con varios productos
                 value:
                   clienteId: cliente_01
                   items:
-                    - producto: Placa de Video
-                      cantidad: 2
-                    - producto: Teclado Mecánico
-                      cantidad: 1
+                    - { producto: Placa de Video, cantidad: 2 }
+                    - { producto: Teclado Mecánico, cantidad: 1 }
+              unProducto:
+                value: { clienteId: cliente_01, producto: Teclado Mecánico, cantidad: 1 }
       responses:
         '201':
-          description: Pedido creado correctamente
+          description: Pedido creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PedidoCreado' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /api/pedidos/{id}/cancelar:
+    patch:
+      tags: [Pedidos]
+      summary: Cancelar un pedido
+      description: Cancela un pedido pendiente y reintegra su stock.
+      operationId: cancelarPedido
+      parameters: [{ $ref: '#/components/parameters/PedidoId' }]
+      responses:
+        '200':
+          description: Pedido cancelado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PedidoCancelado' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/pedidos/historial/{clienteId}:
+    get:
+      tags: [Pedidos]
+      summary: Consultar el historial de un cliente
+      description: Permite al propietario o a un `ADMIN` consultar el historial.
+      operationId: consultarHistorialPedidos
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ClienteId' }]
+      responses:
+        '200':
+          description: Historial del cliente
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Pedido'
-        '400':
-          description: El cliente indicado no está registrado
+                type: array
+                items: { $ref: '#/components/schemas/Pedido' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/clientes/{clienteId}/pedidos:
+    get:
+      tags: [Pedidos]
+      summary: Consultar los pedidos de un cliente
+      description: Ruta alternativa del historial, con el mismo control de acceso.
+      operationId: consultarPedidosDelCliente
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ClienteId' }]
+      responses:
+        '200':
+          description: Pedidos del cliente
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '409':
-          description: Algún producto no existe o no tiene stock suficiente; la operación completa se revierte
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '422':
-          description: El cuerpo de la petición es inválido
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+                type: array
+                items: { $ref: '#/components/schemas/Pedido' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: Access token obtenido mediante `POST /api/auth/login`.
+
+  parameters:
+    ProductoId:
+      in: path
+      name: id
+      required: true
+      description: ID numérico del producto
+      schema: { type: integer, minimum: 1 }
+      example: 1
+    PedidoId:
+      in: path
+      name: id
+      required: true
+      description: ID numérico del pedido
+      schema: { type: integer, minimum: 1 }
+      example: 1
+    ClienteId:
+      in: path
+      name: clienteId
+      required: true
+      description: Identificador público del cliente
+      schema: { type: string, minLength: 1 }
+      example: cliente_01
+    SessionId:
+      in: path
+      name: sessionId
+      required: true
+      description: UUID público de la sesión
+      schema: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: La operación no puede realizarse con los datos o el estado actual
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: No se proporcionaron credenciales válidas
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: El token, sesión, rol o propiedad no autorizan la operación
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflicto con el stock o con relaciones existentes
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    UnprocessableEntity:
+      description: El body no cumple las validaciones
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
   schemas:
+    RegistroDto:
+      type: object
+      required: [clienteId, email, password]
+      properties:
+        clienteId: { type: string, minLength: 3, maxLength: 50, example: cliente_01 }
+        email: { type: string, format: email, example: cliente01@example.com }
+        password: { type: string, format: password, minLength: 8, example: 'Cliente#123' }
+        twoFactorEnabled: { type: boolean, default: true }
+    UsuarioRegistrado:
+      type: object
+      required: [id, clienteId, email, rol, twoFactorEnabled]
+      properties:
+        id: { type: integer, example: 2 }
+        clienteId: { type: string, example: cliente_01 }
+        email: { type: string, format: email }
+        rol: { type: string, const: CLIENTE }
+        twoFactorEnabled: { type: boolean }
     LoginDto:
       type: object
       required: [email, password]
       properties:
-        email:
-          type: string
-          format: email
-          example: admin@estudio.local
-        password:
-          type: string
-          format: password
-          example: Admin#12345
-        totp:
-          type: string
-          example: '123456'
-        deviceName:
-          type: string
-          example: Notebook personal
+        email: { type: string, format: email, example: admin@estudio.local }
+        password: { type: string, format: password, example: 'Admin#12345' }
+        totp: { type: string, pattern: '^\d{6}$', example: '123456' }
+        deviceName: { type: string, minLength: 1, maxLength: 80, example: Notebook personal }
     LoginResponse:
       type: object
       required: [accessToken, refreshToken, sessionId, clienteId, rol]
       properties:
-        accessToken:
-          type: string
-        refreshToken:
-          type: string
-        sessionId:
-          type: string
-          format: uuid
-        clienteId:
-          type: string
-        rol:
-          type: string
-          enum: [CLIENTE, ADMIN]
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        sessionId: { type: string, format: uuid }
+        clienteId: { type: string }
+        rol: { type: string, enum: [CLIENTE, ADMIN] }
+    RefreshTokenDto:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string, minLength: 10 }
+    AccessTokenResponse:
+      type: object
+      required: [accessToken]
+      properties:
+        accessToken: { type: string }
     SesionActiva:
       type: object
       required: [sessionId, deviceName, createdAt, lastUsedAt, expiresAt, current]
       properties:
-        sessionId:
-          type: string
-          format: uuid
-        deviceName:
-          type: string
-        userAgent:
-          type: [string, 'null']
-        ipAddress:
-          type: [string, 'null']
-        createdAt:
-          type: string
-          format: date-time
-        lastUsedAt:
-          type: string
-          format: date-time
-        expiresAt:
-          type: string
-          format: date-time
-        current:
-          type: boolean
+        sessionId: { type: string, format: uuid }
+        deviceName: { type: string }
+        userAgent: { type: [string, 'null'] }
+        ipAddress: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        current: { type: boolean }
+    CrearProductoDto:
+      type: object
+      required: [nombre, precio, stock, categoria]
+      properties:
+        nombre: { type: string, minLength: 1 }
+        precio: { type: number, format: double, exclusiveMinimum: 0 }
+        stock: { type: integer, minimum: 0 }
+        categoria: { type: string, minLength: 1 }
+    ActualizarStockDto:
+      type: object
+      required: [stock]
+      properties:
+        stock: { type: integer, minimum: 0 }
+    Producto:
+      type: object
+      required: [id, nombre, precio, stock, categoria, createdAt]
+      properties:
+        id: { type: integer, example: 1 }
+        nombre: { type: string, example: Teclado Mecánico }
+        precio: { type: number, format: double, example: 4500 }
+        stock: { type: integer, example: 10 }
+        categoria: { type: string, example: Periféricos }
+        createdAt: { type: string, format: date-time }
     CrearPedidoDto:
       type: object
-      required: [clienteId, items]
+      required: [clienteId]
       properties:
-        clienteId:
-          type: string
-          minLength: 1
-          example: cliente_01
+        clienteId: { type: string, minLength: 1, example: cliente_01 }
+        producto: { type: string, minLength: 1, description: Alternativa a items }
+        cantidad: { type: integer, minimum: 1, description: Alternativa a items }
         items:
           type: array
           minItems: 1
-          items:
-            $ref: '#/components/schemas/CrearPedidoItemDto'
+          items: { $ref: '#/components/schemas/CrearPedidoItemDto' }
+      oneOf:
+        - required: [items]
+        - required: [producto, cantidad]
     CrearPedidoItemDto:
       type: object
       required: [producto, cantidad]
       properties:
-        producto:
-          type: string
-          minLength: 1
-          example: Placa de Video
-        cantidad:
-          type: integer
-          minimum: 1
-          example: 2
+        producto: { type: string, minLength: 1, example: Placa de Video }
+        cantidad: { type: integer, minimum: 1, example: 2 }
+        precioUnitario:
+          type: number
+          minimum: 0
+          deprecated: true
+          description: Se acepta por compatibilidad; el servidor usa el precio almacenado.
     Pedido:
       type: object
       required: [id, clienteId, estado, items, total, createdAt]
       properties:
-        id:
-          type: integer
-          example: 1
-        clienteId:
-          type: string
-          example: cliente_01
-        estado:
-          type: string
-          example: Pendiente de Envío
-        stockRestante:
-          type: integer
-          example: 3
+        id: { type: integer, example: 1 }
+        clienteId: { type: string, example: cliente_01 }
+        producto: { type: string, description: Primer producto; campo de compatibilidad }
+        cantidad: { type: integer, description: Primera cantidad; campo de compatibilidad }
+        estado: { type: string, example: Pendiente de Envío }
         items:
           type: array
-          items:
-            $ref: '#/components/schemas/PedidoItem'
-        total:
-          type: number
-          format: double
-          example: 250000
-        createdAt:
-          type: string
-          format: date-time
+          items: { $ref: '#/components/schemas/PedidoItem' }
+        total: { type: number, format: double, example: 250000 }
+        createdAt: { type: string, format: date-time }
+    PedidoCreado:
+      allOf:
+        - { $ref: '#/components/schemas/Pedido' }
+        - type: object
+          required: [stockRestante]
+          properties:
+            stockRestante: { type: integer, example: 3 }
     PedidoItem:
       type: object
       required: [producto, cantidad, precioUnitario]
       properties:
-        producto:
-          type: string
-        cantidad:
-          type: integer
-        precioUnitario:
-          type: number
-          format: double
+        producto: { type: string }
+        cantidad: { type: integer }
+        precioUnitario: { type: number, format: double }
+    PedidoCancelado:
+      type: object
+      required: [id, estado, stockRestante]
+      properties:
+        id: { type: integer, example: 1 }
+        estado: { type: string, const: Cancelado }
+        stockRestante: { type: integer, example: 10 }
     Error:
       type: object
       required: [error]
       properties:
-        error:
-          type: string
+        error: { type: string, example: Descripción del error }

@@ -6,6 +6,7 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-local-compose-encryption-key}
       JWT_SECRET: ${JWT_SECRET:-local-compose-access-secret}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-compose-refresh-secret}
+      DISABLE_AUTH: ${DISABLE_AUTH:-true}
       DEV_TOTP_CODE: ${DEV_TOTP_CODE:-123456}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       SEED_ADMIN_CLIENTE_ID: ${SEED_ADMIN_CLIENTE_ID:-admin}

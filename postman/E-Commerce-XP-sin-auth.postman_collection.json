@@ -1,0 +1,188 @@
+{
+  "info": {
+    "_postman_id": "b7c6e6a4-7ad5-4fa6-84b3-3b5dca496d3d",
+    "name": "E-Commerce XP - Productos sin autenticacion",
+    "description": "Coleccion simplificada para probar productos sin contrasenas ni tokens en el modo de demostracion.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productName",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "CRUD de productos",
+      "item": [
+        {
+          "name": "1 - Crear producto",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('productName', 'Producto Demo ' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201 Created', () => pm.response.to.have.status(201));",
+                  "const producto = pm.response.json();",
+                  "pm.test('El producto tiene ID', () => pm.expect(producto.id).to.exist);",
+                  "pm.collectionVariables.set('productId', String(producto.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"{{productName}}\",\n  \"precio\": 25000,\n  \"stock\": 10,\n  \"categoria\": \"Demo Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/productos",
+            "description": "Crea un producto sin autenticacion."
+          }
+        },
+        {
+          "name": "2 - Consultar catalogo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('La respuesta es un arreglo', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/productos?categoria=Demo%20Postman",
+            "description": "Consulta el catalogo sin autenticacion."
+          }
+        },
+        {
+          "name": "3 - Actualizar stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('El stock quedo en 25', () => pm.expect(pm.response.json().stock).to.eql(25));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": 25\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/productos/{{productId}}/stock",
+            "description": "Actualiza el stock sin autenticacion."
+          }
+        },
+        {
+          "name": "4 - Eliminar producto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/productos/{{productId}}",
+            "description": "Elimina el producto sin autenticacion."
+          }
+        },
+        {
+          "name": "5 - Validar stock negativo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 422 Unprocessable Content', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": -5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/productos/{{productId}}/stock",
+            "description": "Demuestra la validacion de stock sin autenticacion."
+          }
+        }
+      ]
+    }
+  ]
+}

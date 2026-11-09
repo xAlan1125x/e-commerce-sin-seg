@@ -2,6 +2,17 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken, AccessTokenPayload, Rol } from './jwt';
 import { isSessionActive } from './auth.service';
 
+const authDisabled = process.env.DISABLE_AUTH === 'true';
+
+function demoUsuario(): AccessTokenPayload {
+  return {
+    sub: 0,
+    clienteId: process.env.SEED_ADMIN_CLIENTE_ID ?? 'demo',
+    rol: 'ADMIN',
+    sessionId: 'auth-disabled'
+  };
+}
+
 declare global {
   namespace Express {
     interface Request {
@@ -12,6 +23,11 @@ declare global {
 
 /** AuthN: valida la firma y vigencia del access token (JWT). */
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (authDisabled) {
+    req.usuario = demoUsuario();
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   if (!token) {

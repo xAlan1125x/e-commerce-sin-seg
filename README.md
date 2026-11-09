@@ -1,5 +1,23 @@
 # E-Commerce XP: Backend, BDD y frontend
 
+Repositorio de demostración: https://github.com/xAlan1125x/e-commerce-sin-seg
+
+## Modo de demostración sin autenticación
+
+Para facilitar las pruebas manuales desde Postman, el entorno Docker activa
+`DISABLE_AUTH=true` por defecto. En este modo, las rutas de productos y pedidos
+no exigen contraseñas, JWT ni el encabezado `Authorization`.
+
+El código de seguridad **no fue eliminado**. La autenticación JWT, RBAC,
+protección anti-IDOR, sesiones, refresh tokens y validaciones siguen en el
+proyecto y pueden restaurarse sin cambios estructurales: basta con ejecutar la
+API con `DISABLE_AUTH=false` (o quitar la variable). Las pruebas BDD se
+ejecutan explícitamente con autenticación habilitada.
+
+La colección simplificada para Postman está en
+`postman/E-Commerce-XP-sin-auth.postman_collection.json`. Se puede importar o
+crear las peticiones manualmente usando `http://localhost:3000`.
+
 Plataforma backend de comercio electrónico implementada con TypeScript, Express y prácticas de Extreme Programming (XP). El comportamiento se especifica con Cucumber/Gherkin y puede probarse desde una interfaz web sencilla.
 
 Documentación complementaria: [SEGURIDAD.md](SEGURIDAD.md) detalla la implementación de autenticación JWT, autorización RBAC, protección anti-IDOR y hardening.
@@ -332,6 +350,20 @@ al stock responde `409 Conflict` y provoca el rollback:
 
 ## API
 
+### Modo demo para Postman
+
+Con `DISABLE_AUTH=true`, se pueden probar directamente las operaciones de
+productos y pedidos sin login ni tokens. El flujo básico para productos es:
+
+1. `POST /api/productos` con nombre, precio, stock y categoría.
+2. `GET /api/productos` para consultar el catálogo.
+3. `PATCH /api/productos/:id/stock` para actualizar el stock.
+4. `DELETE /api/productos/:id` para eliminar el producto.
+
+Este modo está destinado únicamente a la demostración local. Para probar la
+seguridad original, usar `DISABLE_AUTH=false` y seguir el flujo JWT descrito
+en las secciones siguientes.
+
 ### Autenticación (públicas, sujetas a validación Zod)
 
 - `POST /api/auth/register` registra un usuario (`clienteId`, `email`, `password`, `twoFactorEnabled?`). El rol siempre nace `CLIENTE`.
@@ -470,6 +502,10 @@ La misma prueba puede hacerse desde Swagger en `http://localhost:3000/api-docs`:
 ejecutar el login, copiar `accessToken`, presionar **Authorize**, listar sesiones
 y finalmente ejecutar `DELETE /api/auth/sessions/{sessionId}`.
 
+Por defecto, Compose establece `DISABLE_AUTH=true` para la demostración con
+Postman. Para restaurar las validaciones de autenticación en el entorno local,
+establecer `DISABLE_AUTH=false` en `.env` y reconstruir los contenedores.
+
 ### Variables de entorno
 
 El archivo `.env.example` contiene una configuración local de referencia:
@@ -482,6 +518,7 @@ El archivo `.env.example` contiene una configuración local de referencia:
 | `JWT_SECRET` | Firma de access tokens | Obligatoria |
 | `JWT_REFRESH_SECRET` | Firma de refresh tokens | Obligatoria |
 | `ENCRYPTION_KEY` | Cifrado AES-256-GCM de datos sensibles | Obligatoria |
+| `DISABLE_AUTH` | Desactiva JWT/RBAC para la demostración local | `true` en Compose |
 | `DEV_TOTP_CODE` | Código TOTP fijo para desarrollo y pruebas | `123456` |
 | `LOGIN_RATE_LIMIT_MAX` | Intentos de login por IP cada 15 minutos | `5` |
 | `SEED_ADMIN_CLIENTE_ID` | `clienteId` del administrador inicial | `admin` |

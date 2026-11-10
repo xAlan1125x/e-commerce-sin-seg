@@ -98,10 +98,19 @@ function renderProducts(products) {
       <p class="meta">Categoria: ${escapeHtml(p.categoria)}</p><p class="meta">Stock: ${p.stock} unidades</p>
       <button class="button add-cart" data-product="${escapeHtml(p.nombre)}" data-price="${p.precio}" data-stock="${p.stock}" type="button" ${p.stock < 1 ? 'disabled' : ''}>${p.stock ? 'Agregar al carrito' : 'Sin stock'}</button>
     </article>`).join('') : '<p class="empty">No hay productos para mostrar.</p>';
-  stockList.innerHTML = products.length ? products.map((p) => `<form class="stock-row" data-id="${p.id}">
-    <span>${escapeHtml(p.nombre)}</span><input name="stock" type="number" min="0" step="1" value="${p.stock}" required>
-    <button class="button secondary" type="submit">Guardar</button>
-    <button class="button danger delete-product" data-id="${p.id}" type="button">Eliminar</button></form>`).join('') : '<p class="empty">No hay productos.</p>';
+  stockList.innerHTML = products.length ? products.map((p) => `<form class="product-edit-row" data-id="${p.id}">
+    <strong>Producto #${p.id}</strong>
+    <div class="product-edit-fields">
+      <label>Nombre<input name="nombre" value="${escapeHtml(p.nombre)}" required></label>
+      <label>Precio<input name="precio" type="number" min="0.01" step="0.01" value="${p.precio}" required></label>
+      <label>Stock<input name="stock" type="number" min="0" step="1" value="${p.stock}" required></label>
+      <label>Categoría<input name="categoria" value="${escapeHtml(p.categoria)}" required></label>
+    </div>
+    <div class="product-edit-actions">
+      <button class="button secondary" type="submit">Guardar cambios</button>
+      <button class="button danger delete-product" data-id="${p.id}" type="button">Eliminar</button>
+    </div>
+  </form>`).join('') : '<p class="empty">No hay productos.</p>';
 }
 
 async function loadProducts() {
@@ -167,11 +176,17 @@ $('#product-form').addEventListener('submit', async (e) => {
   try { await api('/api/productos', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(data) }); form.reset(); feedback($('#notice'), 'Producto creado correctamente.'); await loadProducts(); } catch (error) { feedback($('#notice'), error.message, 'error'); } finally { busy(button, false); }
 });
 $('#stock-list').addEventListener('submit', async (e) => {
-  if (!e.target.classList.contains('stock-row')) return;
-  e.preventDefault(); const form = e.target; const button = form.querySelector('button'); busy(button, true);
+  if (!e.target.classList.contains('product-edit-row')) return;
+  e.preventDefault();
+  const form = e.target;
+  const button = form.querySelector('button[type="submit"]');
+  const data = Object.fromEntries(new FormData(form));
+  data.precio = Number(data.precio);
+  data.stock = Number(data.stock);
+  busy(button, true);
   try {
-    await api(`/api/productos/${form.dataset.id}/stock`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ stock: Number(new FormData(form).get('stock')) }) });
-    feedback($('#notice'), 'Stock actualizado correctamente.'); await loadProducts();
+    await api(`/api/productos/${form.dataset.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(data) });
+    feedback($('#notice'), 'Producto actualizado correctamente.'); await loadProducts();
   } catch (error) { feedback($('#notice'), error.message, 'error'); } finally { busy(button, false); }
 });
 $('#stock-list').addEventListener('click', async (e) => {

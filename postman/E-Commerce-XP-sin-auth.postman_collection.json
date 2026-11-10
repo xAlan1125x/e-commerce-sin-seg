@@ -94,7 +94,47 @@
           }
         },
         {
-          "name": "3 - Actualizar stock",
+          "name": "3 - Reemplazar datos del producto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 OK', () => pm.response.to.have.status(200));",
+                  "const producto = pm.response.json();",
+                  "pm.test('Actualizo nombre, precio y categoria', () => {",
+                  "  pm.expect(producto.nombre).to.eql(pm.collectionVariables.get('productName') + ' actualizado');",
+                  "  pm.expect(producto.precio).to.eql(30000);",
+                  "  pm.expect(producto.categoria).to.eql('Demo Postman Actualizada');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"{{productName}} actualizado\",\n  \"precio\": 30000,\n  \"stock\": 15,\n  \"categoria\": \"Demo Postman Actualizada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/productos/{{productId}}",
+            "description": "Reemplaza nombre, precio, stock y categoria sin autenticacion."
+          }
+        },
+        {
+          "name": "4 - Actualizar stock",
           "event": [
             {
               "listen": "test",
@@ -129,7 +169,7 @@
           }
         },
         {
-          "name": "4 - Eliminar producto",
+          "name": "5 - Eliminar producto",
           "event": [
             {
               "listen": "test",
@@ -149,7 +189,7 @@
           }
         },
         {
-          "name": "5 - Validar stock negativo",
+          "name": "6 - Validar stock negativo",
           "event": [
             {
               "listen": "test",

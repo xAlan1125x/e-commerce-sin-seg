@@ -98,6 +98,29 @@ When('el administrador envía una solicitud para actualizar el stock del product
   if (this.response.status < 400) productoGuardado = this.response.body;
 });
 
+When(
+  'el administrador reemplaza el producto con ID {int} por nombre {string}, precio {float}, stock {int} y categoría {string}',
+  async function (id: number, nombre: string, precio: number, stock: number, categoria: string) {
+    const token = await obtenerTokenAdmin();
+    this.response = await request(app)
+      .put(`/api/productos/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre, precio, stock, categoria });
+    respuestaHTTP = { status: this.response.status, body: this.response.body };
+    if (this.response.status < 400) productoGuardado = this.response.body;
+  }
+);
+
+Then(
+  'el producto actualizado debe tener nombre {string}, precio {float}, stock {int} y categoría {string}',
+  function (nombre: string, precio: number, stock: number, categoria: string) {
+    assert.strictEqual(productoGuardado.nombre, nombre);
+    assert.strictEqual(productoGuardado.precio, precio);
+    assert.strictEqual(productoGuardado.stock, stock);
+    assert.strictEqual(productoGuardado.categoria, categoria);
+  }
+);
+
 Then('el stock del producto con ID {int} en la base de datos debe ser {int}', function (id: number, stockEsperado: number) {
   assert.strictEqual(productoGuardado.id, id);
   assert.strictEqual(productoGuardado.stock, stockEsperado);

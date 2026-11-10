@@ -6,7 +6,13 @@ import fs from 'fs';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yaml';
 import { crearPedidoHandler, cancelarPedidoHandler, listarPedidosHandler } from './controllers/pedidos.controller';
-import { crearProductoHandler, listarProductosHandler, actualizarStockHandler, eliminarProductoHandler } from './controllers/productos.controller';
+import {
+  actualizarProductoHandler,
+  actualizarStockHandler,
+  crearProductoHandler,
+  eliminarProductoHandler,
+  listarProductosHandler
+} from './controllers/productos.controller';
 import { historialPedidosHandler } from './controllers/pedidos.controller';
 import {
   listSessionsHandler,
@@ -44,6 +50,7 @@ app.delete('/api/auth/sessions/:sessionId', requireAuth, revokeSessionHandler);
 // --- Catálogo (lectura pública, escritura solo ADMIN) ---
 app.get('/api/productos', listarProductosHandler);
 app.post('/api/productos', requireAuth, requireRole(['ADMIN']), crearProductoHandler);
+app.put('/api/productos/:id', requireAuth, requireRole(['ADMIN']), actualizarProductoHandler);
 app.patch('/api/productos/:id/stock', requireAuth, requireRole(['ADMIN']), actualizarStockHandler);
 app.delete('/api/productos/:id', requireAuth, requireRole(['ADMIN']), eliminarProductoHandler);
 

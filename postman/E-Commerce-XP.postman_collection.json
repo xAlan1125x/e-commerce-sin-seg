@@ -197,6 +197,66 @@
           }
         },
         {
+          "name": "PUT - Reemplazar datos del producto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 OK', () => pm.response.to.have.status(200));",
+                  "const producto = pm.response.json();",
+                  "pm.test('Actualizo nombre, precio y categoria', () => {",
+                  "  pm.expect(producto.nombre).to.eql(pm.collectionVariables.get('productName') + ' actualizado');",
+                  "  pm.expect(producto.precio).to.eql(30000);",
+                  "  pm.expect(producto.categoria).to.eql('Demo Postman Actualizada');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"{{productName}} actualizado\",\n  \"precio\": 30000,\n  \"stock\": 15,\n  \"categoria\": \"Demo Postman Actualizada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/productos/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "productos",
+                "{{productId}}"
+              ]
+            },
+            "description": "UPDATE completo: reemplaza nombre, precio, stock y categoria del producto."
+          }
+        },
+        {
           "name": "PATCH - Actualizar stock",
           "event": [
             {

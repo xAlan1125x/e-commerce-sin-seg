@@ -192,6 +192,29 @@ paths:
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
 
   /api/productos/{id}:
+    put:
+      tags: [Productos]
+      summary: Reemplazar los datos de un producto
+      description: Actualiza nombre, precio, stock y categoría; requiere rol `ADMIN`.
+      operationId: actualizarProducto
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ProductoId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActualizarProductoDto' }
+            example: { nombre: Teclado Mecánico RGB, precio: 52000, stock: 15, categoria: Periféricos }
+      responses:
+        '200':
+          description: Producto actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Producto' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
     delete:
       tags: [Productos]
       summary: Eliminar un producto
@@ -433,6 +456,15 @@ components:
         current: { type: boolean }
     CrearProductoDto:
       type: object
+      required: [nombre, precio, stock, categoria]
+      properties:
+        nombre: { type: string, minLength: 1 }
+        precio: { type: number, format: double, exclusiveMinimum: 0 }
+        stock: { type: integer, minimum: 0 }
+        categoria: { type: string, minLength: 1 }
+    ActualizarProductoDto:
+      type: object
+      description: Representación completa de los campos editables de un producto.
       required: [nombre, precio, stock, categoria]
       properties:
         nombre: { type: string, minLength: 1 }

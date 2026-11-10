@@ -5,18 +5,34 @@ export type ResultadoProducto =
   | { producto: Producto; status: number }
   | { error: string; status: number };
 
+type DatosProducto = Omit<Producto, 'id' | 'createdAt'>;
+
+function normalizarDatosProducto(
+  nombre: unknown,
+  precio: unknown,
+  stock: unknown,
+  categoria: unknown
+): DatosProducto | null {
+  if (typeof nombre !== 'string' || !nombre.trim() ||
+      typeof categoria !== 'string' || !categoria.trim() ||
+      typeof precio !== 'number' || !Number.isFinite(precio) || precio <= 0 ||
+      typeof stock !== 'number' || !Number.isInteger(stock) || stock < 0) {
+    return null;
+  }
+
+  return { nombre: nombre.trim(), precio, stock, categoria: categoria.trim() };
+}
+
 export class ProductosService {
   constructor(private readonly repo = new ProductosRepository()) {}
 
   async crear(nombre: unknown, precio: unknown, stock: unknown, categoria: unknown): Promise<ResultadoProducto> {
-    if (typeof nombre !== 'string' || !nombre.trim() ||
-        typeof categoria !== 'string' || !categoria.trim() ||
-        typeof precio !== 'number' || !Number.isFinite(precio) || precio <= 0 ||
-        typeof stock !== 'number' || !Number.isInteger(stock) || stock < 0) {
+    const datos = normalizarDatosProducto(nombre, precio, stock, categoria);
+    if (!datos) {
       return { error: 'Los datos del producto no son válidos', status: 422 };
     }
     try {
-      const producto = await this.repo.crear({ nombre: nombre.trim(), precio, stock, categoria: categoria.trim() });
+      const producto = await this.repo.crear(datos);
       return { producto, status: 201 };
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') {
@@ -28,6 +44,31 @@ export class ProductosService {
 
   listar(categoria?: string): Promise<Producto[]> {
     return this.repo.listar(categoria);
+  }
+
+  async actualizar(
+    id: number,
+    nombre: unknown,
+    precio: unknown,
+    stock: unknown,
+    categoria: unknown
+  ): Promise<ResultadoProducto> {
+    const datos = normalizarDatosProducto(nombre, precio, stock, categoria);
+    if (!datos) {
+      return { error: 'Los datos del producto no son válidos', status: 422 };
+    }
+
+    try {
+      const producto = await this.repo.actualizar(id, datos);
+      return producto
+        ? { producto, status: 200 }
+        : { error: 'Producto no encontrado', status: 404 };
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') {
+        return { error: 'Ya existe un producto con ese nombre', status: 422 };
+      }
+      throw error;
+    }
   }
 
   async actualizarStock(id: number, stock: unknown): Promise<ResultadoProducto> {

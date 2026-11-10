@@ -12,6 +12,17 @@ export const listarProductosHandler = async (req: Request, res: Response) => {
   return res.status(200).json(await service.listar(typeof req.query.categoria === 'string' ? req.query.categoria : undefined));
 };
 
+export const actualizarProductoHandler = async (req: Request, res: Response) => {
+  const result = await service.actualizar(
+    Number(req.params.id),
+    req.body?.nombre,
+    req.body?.precio,
+    req.body?.stock,
+    req.body?.categoria
+  );
+  return 'error' in result ? res.status(result.status).json({ error: result.error }) : res.status(result.status).json(result.producto);
+};
+
 export const actualizarStockHandler = async (req: Request, res: Response) => {
   const result = await service.actualizarStock(Number(req.params.id), req.body?.stock);
   return 'error' in result ? res.status(result.status).json({ error: result.error }) : res.status(result.status).json(result.producto);

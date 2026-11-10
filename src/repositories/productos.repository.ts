@@ -34,6 +34,12 @@ export class ProductosRepository {
     });
   }
 
+  async actualizar(id: number, datos: Omit<Producto, 'id' | 'createdAt'>): Promise<Producto | null> {
+    const producto = await prisma.producto.findUnique({ where: { id } });
+    if (!producto) return null;
+    return prisma.producto.update({ where: { id }, data: datos });
+  }
+
   async actualizarStock(id: number, stock: number): Promise<Producto | null> {
     const producto = await prisma.producto.findUnique({ where: { id } });
     if (!producto) return null;

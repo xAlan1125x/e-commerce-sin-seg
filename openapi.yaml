@@ -1,8 +1,12 @@
 openapi: 3.1.0
 info:
   title: E-Commerce XP API
-  version: 1.1.0
-  description: API REST para autenticación, sesiones, catálogo y pedidos transaccionales.
+  version: 1.2.0
+  description: |
+    API REST para autenticación, sesiones, catálogo y pedidos transaccionales.
+    El contrato describe el modo seguro normal. En la demostración local puede
+    configurarse `DISABLE_AUTH=true`; en ese caso el backend omite la exigencia
+    del Bearer JWT y asume un usuario `ADMIN` en las rutas protegidas.
 servers:
   - url: http://localhost:3000
     description: Entorno local

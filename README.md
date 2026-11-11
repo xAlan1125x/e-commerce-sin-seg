@@ -31,7 +31,7 @@ Desde `http://localhost:3000` se puede:
 - Iniciar sesión (JWT) o registrarse desde el panel de "Sesión", visible en ambas vistas.
 - Cambiar entre las vistas de desarrollo **Comprador** y **Vendedor**.
 - Como comprador, consultar el catálogo, filtrar por categoría, crear un carrito multiítem, confirmar pedidos y consultar/cancelar tu propio historial (requiere sesión iniciada como ese cliente).
-- Como vendedor autenticado con rol `ADMIN`, crear y eliminar productos, actualizar stock, consultar todos los pedidos y ver sus estados, clientes, fechas y totales.
+- Como vendedor autenticado con rol `ADMIN`, crear y eliminar productos, editar nombre, precio, stock y categoría, consultar todos los pedidos y ver sus estados, clientes, fechas y totales.
 - Ver mensajes de procesamiento, éxito y error que se limpian y vuelven a mostrar en cada acción.
 - Ver el stock actualizado después de cada operación.
 - Como vendedor, eliminar productos que todavía no estén asociados a pedidos y refrescar el catálogo, el inventario y los pedidos sin recargar la página.
@@ -40,7 +40,8 @@ Desde `http://localhost:3000` se puede:
 
 La API REST también permite:
 
-- Actualizar el stock de un producto existente (rol `ADMIN`).
+- Reemplazar nombre, precio, stock y categoría de un producto existente mediante `PUT` (rol `ADMIN`).
+- Actualizar únicamente el stock mediante `PATCH` (rol `ADMIN`).
 - Cancelar pedidos pendientes y reintegrar su stock.
 - Consultar el historial de pedidos de un cliente, protegido contra IDOR (solo el propio cliente o un `ADMIN`).
 - Crear pedidos con uno o varios productos.
@@ -91,6 +92,20 @@ Criterios de aceptación:
 - Al enviar un nuevo valor para un producto existente, su stock se actualiza.
 - Si el producto no existe, el sistema responde HTTP `404 Not Found`.
 - No se permiten valores de stock negativos.
+
+#### Extensión CRUD - Actualización completa de productos
+
+Como administrador de la tienda, quiero editar todos los datos comerciales de
+un producto para mantener actualizado el catálogo.
+
+Criterios de aceptación:
+
+- `PUT /api/productos/:id` recibe nombre, precio, stock y categoría.
+- Los cuatro campos editables se reemplazan en una sola operación.
+- Si el producto no existe, el sistema responde HTTP `404 Not Found`.
+- Si falta un campo, el precio no es positivo o el stock no es un entero mayor
+  o igual que cero, responde HTTP `422 Unprocessable Content`.
+- No se permite reemplazar el nombre por otro que ya pertenezca a un producto.
 
 #### HU04 - Creación de pedidos y checkout
 
@@ -161,7 +176,7 @@ Como administrador de la tienda, quiero que solo el personal autorizado pueda mo
 Criterios de aceptación:
 
 - El rol se asigna siempre en `CLIENTE` al registrarse; nunca se confía en el body de la request para asignar `ADMIN` (previene escalación de privilegios).
-- Crear, actualizar stock y eliminar productos, y listar todos los pedidos, requieren un access token válido con rol `ADMIN` (`requireAuth` + `requireRole`); sin token responde `401`, con rol insuficiente responde `403`.
+- Crear, reemplazar, actualizar stock y eliminar productos, y listar todos los pedidos, requieren un access token válido con rol `ADMIN` (`requireAuth` + `requireRole`); sin token responde `401`, con rol insuficiente responde `403`.
 - Consultar el historial de un cliente (`GET /api/pedidos/historial/:clienteId`) exige que el `clienteId` del token coincida con el de la URL, salvo que el usuario sea `ADMIN` (`requireOwnership`, previene IDOR); un cliente que intenta ver el historial de otro recibe `403`.
 - CORS solo permite el origen configurado en `CORS_ORIGIN` (por defecto el propio frontend).
 - Los bodies de `/api/auth/*` se validan con esquemas Zod estrictos antes de tocar la base de datos.
@@ -230,6 +245,7 @@ El ciclo aplicado es **Red → Green → Refactor**: primero se expresa el compo
 │   ├── creacion_productos.feature  # HU01: alta y validaciones
 │   ├── consulta_catalogo.feature    # HU02: listado y filtro
 │   ├── actualizacion_stock.feature  # HU03: inventario
+│   ├── actualizacion_producto.feature # CRUD: nombre, precio, stock y categoría
 │   ├── creacion_pedidos.feature     # HU04: checkout y stock
 │   ├── cancelacion_pedido.feature   # HU05: cancelación y reintegro
 │   ├── historial_pedidos.feature    # HU06: historial por cliente
@@ -325,9 +341,10 @@ su `usuarioId`, estado, total, fecha y relación con `DetallePedido`.
 ## OpenAPI y Swagger UI
 
 El contrato declarativo se encuentra en `openapi.yaml` (OpenAPI 3.1). Allí se
-documenta `POST /api/pedidos`, su `requestBody`, los DTO esperados, un ejemplo y
-las respuestas `201`, `400`, `409` y `422`. `src/app.ts` carga ese archivo y
-publica Swagger UI como middleware de Express en `/api-docs`.
+documentan las mismas rutas de autenticación, sesiones, productos y pedidos que
+registra `src/app.ts`, incluidos sus parámetros, bodies, ejemplos, respuestas y
+requisitos de seguridad. `src/app.ts` carga ese archivo y publica Swagger UI
+como middleware de Express en `/api-docs`.
 
 La validación efectiva del body no depende de Swagger: se realiza antes del
 controlador mediante el esquema Zod `crearPedidoSchema` de
@@ -357,8 +374,9 @@ productos y pedidos sin login ni tokens. El flujo básico para productos es:
 
 1. `POST /api/productos` con nombre, precio, stock y categoría.
 2. `GET /api/productos` para consultar el catálogo.
-3. `PATCH /api/productos/:id/stock` para actualizar el stock.
-4. `DELETE /api/productos/:id` para eliminar el producto.
+3. `PUT /api/productos/:id` para reemplazar nombre, precio, stock y categoría.
+4. `PATCH /api/productos/:id/stock` para actualizar únicamente el stock.
+5. `DELETE /api/productos/:id` para eliminar el producto.
 
 Este modo está destinado únicamente a la demostración local. Para probar la
 seguridad original, usar `DISABLE_AUTH=false` y seguir el flujo JWT descrito
@@ -384,6 +402,7 @@ Las rutas protegidas usan el encabezado `Authorization: Bearer <accessToken>`.
 
 - `GET /api/productos?categoria=Audio` lista y filtra productos (pública).
 - `POST /api/productos` crea un producto. **Requiere `Authorization: Bearer <accessToken>` con rol `ADMIN`.**
+- `PUT /api/productos/:id` reemplaza nombre, precio, stock y categoría. **Requiere rol `ADMIN`.**
 - `PATCH /api/productos/:id/stock` actualiza stock. **Requiere rol `ADMIN`.**
 - `DELETE /api/productos/:id` elimina un producto que todavía no esté incluido en pedidos. **Requiere rol `ADMIN`.**
 - `POST /api/pedidos` crea un pedido (pública).
@@ -391,6 +410,11 @@ Las rutas protegidas usan el encabezado `Authorization: Bearer <accessToken>`.
 - `PATCH /api/pedidos/:id/cancelar` cancela un pedido pendiente (pública).
 - `GET /api/pedidos/historial/:clienteId` / `GET /api/clientes/:clienteId/pedidos` consultan el historial del cliente. **Requiere estar autenticado como ese mismo `clienteId`, o ser `ADMIN`.**
 - `GET /` sirve el frontend.
+
+El catálogo solo implementa el query parameter `categoria`. Parámetros como
+`precio` no forman parte del contrato y no filtran el resultado. La eliminación
+siempre requiere un ID en la ruta (`DELETE /api/productos/:id`); no existe una
+eliminación masiva por categoría.
 
 Las rutas marcadas como protegidas devuelven `401` sin token (o token inválido/expirado) y `403` con un token válido pero sin los permisos necesarios. Las rutas públicas de pedidos se mantienen así para conservar los escenarios BDD existentes; el historial y el listado global sí están protegidos.
 
@@ -541,6 +565,11 @@ curl -X POST http://localhost:3000/api/auth/login \
 curl -X POST http://localhost:3000/api/productos \
   -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" \
   -d '{"nombre":"Mouse","precio":15000,"stock":10,"categoria":"Perifericos"}'
+
+# Reemplazar todos los datos editables (reemplazar <ID> por el ID creado)
+curl -X PUT http://localhost:3000/api/productos/<ID> \
+  -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" \
+  -d '{"nombre":"Mouse ergonomico","precio":18000,"stock":8,"categoria":"Perifericos"}'
 
 # Sin token -> 401; con token de un CLIENTE -> 403 (RBAC)
 # Historial de otro cliente con tu propio token -> 403 (IDOR)

@@ -70,6 +70,18 @@ El catálogo debe responder con el código `200 OK` y un arreglo JSON.
 
 ### Preparar Postman
 
+`npm run docker:up` utiliza `DISABLE_AUTH=true` por defecto. En ese modo las
+rutas protegidas se pueden demostrar sin token, aunque el login continúa
+disponible. Hay dos colecciones según lo que se quiera explicar:
+
+- `E-Commerce-XP-sin-auth.postman_collection.json`: CRUD básico, sin login ni
+  header `Authorization`.
+- `E-Commerce-XP.postman_collection.json`: flujo completo con login, Bearer JWT
+  y variables. Para demostrar realmente los controles `401` y `403`, establecer
+  `DISABLE_AUTH=false` en `.env` y reconstruir o reiniciar la aplicación.
+
+El guion de esta guía usa la colección completa:
+
 1. Presionar **Import**.
 2. Elegir `postman/E-Commerce-XP.postman_collection.json`.
 3. Abrir la colección **E-Commerce XP - Exposición HTTP**.
@@ -101,6 +113,11 @@ la petición.
   `/api/productos/{{productId}}`, Postman reemplaza `{{productId}}` por el valor
   de la variable antes de enviar la request.
 
+En esta API, `categoria` es el único filtro implementado para `GET
+/api/productos`. Enviar `?precio=4500` no filtra porque `precio` no forma parte
+del contrato. Para eliminar se utiliza el ID como path parameter (`DELETE
+/api/productos/{{productId}}`); no existe `DELETE` por categoría.
+
 ### Authorization
 
 **Authorization** define cómo se acredita la identidad del cliente ante la API.
@@ -118,6 +135,10 @@ Algunos tipos habituales son:
 
 En esta colección se escribe `{{accessToken}}` como Bearer Token. Postman
 construye automáticamente el header `Authorization`.
+
+En modo demo (`DISABLE_AUTH=true`) el backend no exige ese header. En modo
+seguro (`DISABLE_AUTH=false`) sí valida el JWT y el rol `ADMIN` para modificar
+productos.
 
 ### Headers
 

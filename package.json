@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test:e2e": "prisma db seed && cross-env NODE_ENV=test cucumber-js",
+    "test:e2e": "prisma db seed && cross-env DISABLE_AUTH=false NODE_ENV=test cucumber-js",
     "dev": "ts-node src/app.ts",
     "start": "ts-node src/app.ts",
     "db:start": "docker compose up -d postgres --wait",
